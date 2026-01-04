@@ -102,7 +102,7 @@ make -j4
 
 If successful, you’ll get:
 
-`hid_keyboard_demo.uf2`
+`picow_controller.uf2`
 
 ---
 

@@ -1,4 +1,4 @@
-set(PROJECT       hid_keyboard_demo)
+set(PROJECT       picow_controller)
 set(PICO_BOARD    pico_w)
 set(PICO_SDK_PATH $ENV{PICO_SDK_PATH})
 
@@ -7,7 +7,7 @@ include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 project(${PROJECT} C CXX ASM)
 pico_sdk_init()
 add_executable(${PROJECT}
-    hid_keyboard_controller.c
+    picow_controller.c
     picow_bt_example_background.c
 )
 target_include_directories(${PROJECT} PRIVATE
