@@ -84,7 +84,7 @@ If you haven’t set up the Pico SDK yet, follow the [official guide](https://gi
 Clone this repo:
 
 ```
-git clone <your-repo-url>  
+git clone git@github.com:paulstallard/picow_controller.git
 cd picow_controller
 ```
 
@@ -140,8 +140,6 @@ The onboard LED provides visual feedback:
 - LED turns **solid ON** for ~50 ms when a key is sent
 - Overrides the blink pattern temporarily
 - Blinking resumes automatically
-
-This gives the device a polished, responsive feel.
 
 ---
 
