@@ -1,12 +1,16 @@
-# Pico W BLE Keyboard (GPIO‑Triggered I/K Keys + LED Status)
+# Pico W Controller
 
 This project turns a Raspberry Pi Pico W into a Bluetooth LE keyboard that sends the keys **I** and
 **K** when two physical buttons are pressed.  It is based on the official Raspberry Pi / BTstack
 `hid_keyboard_demo` example, with minimal modifications to support GPIO input and LED status
 feedback.
 
-This is ideal for simple game controllers, accessibility devices, or any project where physical
-switches need to act as keyboard keys on an iPad or other BLE‑capable device.
+The controller was built for
+[MyShift](https://mywhoosh.com/myshift-mywhooshs-virtual-shifting-explained/) virtual gear shifting
+in [MyWhoosh](https://mywhoosh.com/). The two buttons can be mounted on the bike and used to control
+gear changes by sending the keyboard shortcuts (I and J) that change the virtual gear. The project
+was built to work with the game running on an iPad but should work with any platform that can
+connect to a BLE keyboard and uses the same shortcuts.
 
 ---
 
@@ -29,15 +33,12 @@ switches need to act as keyboard keys on an iPad or other BLE‑capable device.
 - Raspberry Pi Pico W  
 - 2 × momentary push buttons  
 - Wires / breadboard  
-- USB cable for flashing
+- USB cable for flashing (and power)
 
 ### Wiring
 
-Each button is wired using the Pico’s internal pull‑ups:
-
-```
-3V3 → (internal pull‑up) → GPIO → button → GND
-```
+The Pico GPIO pins are configured to use their internal pull-up resistors.
+The switches should be wired between the relevant GPIO pin and ground.
 
 Default pins:
 
@@ -45,8 +46,6 @@ Default pins:
 |--------|----------|
 | I key  | GP14     |
 | K key  | GP15     |
-
-The onboard LED is GPIO 25 and is controlled automatically.
 
 ---
 
@@ -76,9 +75,7 @@ Everything else remains as in the original demo.
 - CMake  
 - ARM GCC toolchain  
 
-If you haven’t set up the Pico SDK yet, follow the official guide:
-
-https://github.com/raspberrypi/pico-sdk
+If you haven’t set up the Pico SDK yet, follow the [official guide](https://github.com/raspberrypi/pico-sdk).
 
 ---
 
@@ -88,7 +85,7 @@ Clone this repo:
 
 ```
 git clone <your-repo-url>  
-cd pico_ble_keyboard
+cd picow_controller
 ```
 
 Create a build directory, configure and build the project:
@@ -121,7 +118,7 @@ The Pico will reboot and start advertising as a BLE keyboard.
 ## 📱 Pairing With an iPad
 
 1. Open **Settings → Bluetooth**  
-2. Look for **HID Keyboard Demo**  
+2. Look for **PICO Controller**  
 3. Tap to connect  
 4. Press your buttons — you should see **I** and **K** appear in any text field
 
@@ -129,7 +126,7 @@ The Pico will reboot and start advertising as a BLE keyboard.
 
 ## 💡 LED Behaviour
 
-The onboard LED (GPIO 25) provides visual feedback:
+The onboard LED provides visual feedback:
 
 ### Pairing Mode (Not Connected)
 - LED blinks **fast** (200 ms interval)
@@ -177,9 +174,6 @@ Increase the GPIO polling interval in the code.
 
 ### Want different keys?  
 Replace the HID codes in the GPIO handler.
-
-### LED doesn’t blink  
-Check that GPIO 25 is not being used for anything else.
 
 ---
 
