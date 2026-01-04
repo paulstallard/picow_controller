@@ -46,7 +46,6 @@
  */
 // *****************************************************************************
 
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,13 +61,15 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "btstack_run_loop.h"
+#include "pico/cyw43_arch.h"
 
 #define BUTTON_I 14
 #define BUTTON_K 15
 
-
-// to enable demo text on POSIX systems
-// #undef HAVE_BTSTACK_STDIN
+// LED status state
+static btstack_timer_source_t led_timer;
+static bool led_on = false;
+static bool led_override = false;   // used during keypress flash
 
 // timing of keypresses
 #define TYPING_KEYDOWN_MS  20
@@ -333,18 +334,45 @@ static void demo_text_timer_handler(btstack_timer_source_t * ts){
 
 #endif
 
+// LED heartbeat / pairing blink
+static void led_timer_handler(btstack_timer_source_t *ts) {
+    if (!led_override) {
+        // Normal blinking based on connection state
+        led_on = !led_on;
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+    }
+
+    // Choose blink speed
+    int interval_ms = (app_state == APP_CONNECTED) ? 1000 : 200;
+
+    btstack_run_loop_set_timer(ts, interval_ms);
+    btstack_run_loop_add_timer(ts);
+}
+
+// Send single key with LED flash
 static void send_single_key(uint8_t keycode){
-    if (!hid_cid) return;   // not connected
+    if (!hid_cid) return;
+
+    // Override LED blinking
+    led_override = true;
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
 
     uint8_t report[] = { 0xa1, REPORT_ID, 0, 0, keycode, 0, 0, 0, 0, 0 };
     hid_device_send_interrupt_message(hid_cid, report, sizeof(report));
     sleep_ms(30);
 
-    report[4] = 0;  // key release
+    report[4] = 0;
     hid_device_send_interrupt_message(hid_cid, report, sizeof(report));
+
+    // Short flash
+    sleep_ms(50);
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+
+    // Resume blinking
+    led_override = false;
 }
 
-
+// Packet handler
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size){
     UNUSED(channel);
     UNUSED(packet_size);
@@ -418,6 +446,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
     }
 }
 
+// Button state for edge detection
 static bool last_i_state = true;   // true = released (because of pull-up)
 static bool last_k_state = true;
 
@@ -455,8 +484,6 @@ static void gpio_timer_handler(btstack_timer_source_t *ts) {
  * At the end the Bluetooth stack is started.
  */
 
-/* LISTING_START(MainConfiguration): Setup HID Device */
-
 int btstack_main(int argc, const char * argv[]);
 int btstack_main(int argc, const char * argv[]){
     (void)argc;
@@ -467,7 +494,7 @@ int btstack_main(int argc, const char * argv[]){
     // use Limited Discoverable Mode; Peripheral; Keyboard as CoD
     gap_set_class_of_device(0x2540);
     // set local name to be identified - zeroes will be replaced by actual BD ADDR
-    gap_set_local_name("HID Keyboard Demo 00:00:00:00:00:00");
+    gap_set_local_name("PICO-W MW Controller");
     // allow for role switch in general and sniff mode
     gap_set_default_link_policy_settings( LM_LINK_POLICY_ENABLE_ROLE_SWITCH | LM_LINK_POLICY_ENABLE_SNIFF_MODE );
     // allow for role switch on outgoing connections - this allow HID Host to become master when we re-connect to it
@@ -508,9 +535,11 @@ int btstack_main(int argc, const char * argv[]){
     printf("HID service record size: %u\n", de_get_len( hid_service_buffer));
     sdp_register_service(hid_service_buffer);
 
-    // See https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers if you don't have a USB Vendor ID and need a Bluetooth Vendor ID
     // device info: BlueKitchen GmbH, product 1, version 1
-    device_id_create_sdp_record(device_id_sdp_service_buffer, 0x10003, DEVICE_ID_VENDOR_ID_SOURCE_BLUETOOTH, BLUETOOTH_COMPANY_ID_BLUEKITCHEN_GMBH, 1, 1);
+    device_id_create_sdp_record(device_id_sdp_service_buffer, 0x10003,
+        DEVICE_ID_VENDOR_ID_SOURCE_BLUETOOTH,
+        BLUETOOTH_COMPANY_ID_BLUEKITCHEN_GMBH,
+        1, 1);
     printf("Device ID SDP service record size: %u\n", de_get_len((uint8_t*)device_id_sdp_service_buffer));
     sdp_register_service(device_id_sdp_service_buffer);
 
@@ -531,6 +560,7 @@ int btstack_main(int argc, const char * argv[]){
 
     btstack_ring_buffer_init(&send_buffer, send_buffer_storage, sizeof(send_buffer_storage));
 
+    // Button GPIOs
     gpio_init(BUTTON_I);
     gpio_set_dir(BUTTON_I, GPIO_IN);
     gpio_pull_up(BUTTON_I);
@@ -538,6 +568,14 @@ int btstack_main(int argc, const char * argv[]){
     gpio_init(BUTTON_K);
     gpio_set_dir(BUTTON_K, GPIO_IN);
     gpio_pull_up(BUTTON_K);
+
+    // ensure LED starts off
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+
+    // Start LED status blinking
+    btstack_run_loop_set_timer_handler(&led_timer, led_timer_handler);
+    btstack_run_loop_set_timer(&led_timer, 200);   // start in pairing mode
+    btstack_run_loop_add_timer(&led_timer);
 
     // Start GPIO polling timer
     btstack_run_loop_set_timer_handler(&gpio_timer, gpio_timer_handler);
@@ -547,5 +585,5 @@ int btstack_main(int argc, const char * argv[]){
     // turn on!
     hci_power_control(HCI_POWER_ON);
 }
-/* LISTING_END */
 /* EXAMPLE_END */
+
