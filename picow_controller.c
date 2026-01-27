@@ -37,15 +37,6 @@
 
 #define BTSTACK_FILE__ "hid_keyboard_demo.c"
  
-// *****************************************************************************
-/* EXAMPLE_START(hid_keyboard_demo): HID Keyboard Classic
- *
- * @text This HID Device example demonstrates how to implement
- * an HID keyboard. Without a HAVE_BTSTACK_STDIN, a fixed demo text is sent
- * If HAVE_BTSTACK_STDIN is defined, you can type from the terminal
- */
-// *****************************************************************************
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,10 +44,6 @@
 #include <inttypes.h>
 
 #include "btstack.h"
-
-#ifdef HAVE_BTSTACK_STDIN
-#include "btstack_stdin.h"
-#endif
 
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
@@ -70,10 +57,6 @@
 static btstack_timer_source_t led_timer;
 static bool led_on = false;
 static bool led_override = false;   // used during keypress flash
-
-// timing of keypresses
-#define TYPING_KEYDOWN_MS  20
-#define TYPING_DELAY_MS    20
 
 // When not set to 0xffff, sniff and sniff subrating are enabled
 static uint16_t host_max_latency = 1600;
@@ -136,56 +119,6 @@ const uint8_t hid_descriptor_keyboard[] = {
     0xc0,                          // End collection
 };
 
-// 
-#define CHAR_ILLEGAL     0xff
-#define CHAR_RETURN     '\n'
-#define CHAR_ESCAPE      27
-#define CHAR_TAB         '\t'
-#define CHAR_BACKSPACE   0x7f
-
-// Simplified US Keyboard with Shift modifier
-
-/**
- * English (US)
- */
-static const uint8_t keytable_us_none [] = {
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /*   0-3 */
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',                   /*  4-13 */
-    'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',                   /* 14-23 */
-    'u', 'v', 'w', 'x', 'y', 'z',                                       /* 24-29 */
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',                   /* 30-39 */
-    CHAR_RETURN, CHAR_ESCAPE, CHAR_BACKSPACE, CHAR_TAB, ' ',            /* 40-44 */
-    '-', '=', '[', ']', '\\', CHAR_ILLEGAL, ';', '\'', 0x60, ',',       /* 45-54 */
-    '.', '/', CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,   /* 55-60 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 61-64 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 65-68 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 69-72 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 73-76 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 77-80 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 81-84 */
-    '*', '-', '+', '\n', '1', '2', '3', '4', '5',                       /* 85-97 */
-    '6', '7', '8', '9', '0', '.', 0xa7,                                 /* 97-100 */
-}; 
-
-static const uint8_t keytable_us_shift[] = {
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /*  0-3  */
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',                   /*  4-13 */
-    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',                   /* 14-23 */
-    'U', 'V', 'W', 'X', 'Y', 'Z',                                       /* 24-29 */
-    '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',                   /* 30-39 */
-    CHAR_RETURN, CHAR_ESCAPE, CHAR_BACKSPACE, CHAR_TAB, ' ',            /* 40-44 */
-    '_', '+', '{', '}', '|', CHAR_ILLEGAL, ':', '"', 0x7E, '<',         /* 45-54 */
-    '>', '?', CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,   /* 55-60 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 61-64 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 65-68 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 69-72 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 73-76 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 77-80 */
-    CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 81-84 */
-    '*', '-', '+', '\n', '1', '2', '3', '4', '5',                       /* 85-97 */
-    '6', '7', '8', '9', '0', '.', 0xb1,                                 /* 97-100 */
-}; 
-
 // STATE
 
 static uint8_t hid_service_buffer[300];
@@ -195,19 +128,6 @@ static btstack_packet_callback_registration_t hci_event_callback_registration;
 static uint16_t hid_cid;
 static uint8_t hid_boot_device = 0;
 
-// HID Report sending
-static uint8_t                send_buffer_storage[16];
-static btstack_ring_buffer_t  send_buffer;
-static btstack_timer_source_t send_timer;
-static uint8_t                send_modifier;
-static uint8_t                send_keycode;
-static bool                   send_active;
-
-#ifdef HAVE_BTSTACK_STDIN
-static bd_addr_t device_addr;
-static const char * device_addr_string = "BC:EC:5D:E6:15:03";
-#endif
-
 static enum {
     APP_BOOTING,
     APP_NOT_CONNECTED,
@@ -215,124 +135,10 @@ static enum {
     APP_CONNECTED
 } app_state = APP_BOOTING;
 
-// HID Keyboard lookup
-static bool lookup_keycode(uint8_t character, const uint8_t * table, int size, uint8_t * keycode){
-    int i;
-    for (i=0;i<size;i++){
-        if (table[i] != character) continue;
-        *keycode = i;
-        return true;
-    }
-    return false;
-}
-
-static bool keycode_and_modifer_us_for_character(uint8_t character, uint8_t * keycode, uint8_t * modifier){
-    bool found;
-    found = lookup_keycode(character, keytable_us_none, sizeof(keytable_us_none), keycode);
-    if (found) {
-        *modifier = 0;  // none
-        return true;
-    }
-    found = lookup_keycode(character, keytable_us_shift, sizeof(keytable_us_shift), keycode);
-    if (found) {
-        *modifier = 2;  // shift
-        return true;
-    }
-    return false;
-}
-
 static void send_report(int modifier, int keycode){
     uint8_t report[] = { 0xa1, REPORT_ID, modifier, 0, keycode, 0, 0, 0, 0, 0};
     hid_device_send_interrupt_message(hid_cid, &report[0], sizeof(report));
 }
-
-static void trigger_key_up(btstack_timer_source_t * ts){
-    UNUSED(ts);
-    hid_device_request_can_send_now_event(hid_cid);
-}
-
-static void send_next(btstack_timer_source_t * ts) {
-    // get next key from buffer
-    uint8_t character;
-    uint32_t num_bytes_read = 0;
-    btstack_ring_buffer_read(&send_buffer, &character, 1, &num_bytes_read);
-    if (num_bytes_read == 0) {
-        // buffer empty, nothing to send
-        send_active = false;
-    } else {
-        send_active = true;
-        // lookup keycode and modifier using US layout
-        bool found = keycode_and_modifer_us_for_character(character, &send_keycode, &send_modifier);
-        if (found) {
-            // request can send now
-            hid_device_request_can_send_now_event(hid_cid);
-        } else {
-            // restart timer for next character
-            btstack_run_loop_set_timer(ts, TYPING_DELAY_MS);
-            btstack_run_loop_add_timer(ts);
-        }
-    }
-}
-
-static void queue_character(char character){
-    btstack_ring_buffer_write(&send_buffer, (uint8_t *) &character, 1);
-    if (send_active == false) {
-        send_next(&send_timer);
-    }
-}
-
-// Demo Application
-
-#ifdef HAVE_BTSTACK_STDIN
-
-// On systems with STDIN, we can directly type on the console
-
-static void stdin_process(char character){
-    switch (app_state){
-        case APP_BOOTING:
-        case APP_CONNECTING:
-            // ignore
-            break;
-        case APP_CONNECTED:
-            // add char to send buffer
-            queue_character(character);
-            break;
-        case APP_NOT_CONNECTED:
-            printf("Connecting to %s...\n", bd_addr_to_str(device_addr));
-            hid_device_connect(device_addr, &hid_cid);
-            break;
-        default:
-            btstack_assert(false);
-            break;
-    }
-}
-#else
-
-// On embedded systems, send constant demo text
-
-#define TYPING_DEMO_PERIOD_MS 100
-
-static const char * demo_text = "\n\nHello World!\n\nThis is the BTstack HID Keyboard Demo running on an Embedded Device.\n\n";
-static int demo_pos;
-static btstack_timer_source_t demo_text_timer;
-
-static void demo_text_timer_handler(btstack_timer_source_t * ts){
-    UNUSED(ts);
-
-    // queue character
-    uint8_t character = demo_text[demo_pos++];
-    if (demo_text[demo_pos] == 0){
-        demo_pos = 0;
-    }
-    queue_character(character);
-
-    // set timer for next character
-    btstack_run_loop_set_timer_handler(&demo_text_timer, demo_text_timer_handler);
-    btstack_run_loop_set_timer(&demo_text_timer, TYPING_DEMO_PERIOD_MS);
-    btstack_run_loop_add_timer(&demo_text_timer);
-}
-
-#endif
 
 // LED heartbeat / pairing blink
 static void led_timer_handler(btstack_timer_source_t *ts) {
@@ -350,19 +156,16 @@ static void led_timer_handler(btstack_timer_source_t *ts) {
 }
 
 // Send single key with LED flash
-static void send_single_key(uint8_t keycode){
+static void send_single_key(uint8_t modifier, uint8_t keycode){
     if (!hid_cid) return;
 
     // Override LED blinking
     led_override = true;
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
 
-    uint8_t report[] = { 0xa1, REPORT_ID, 0, 0, keycode, 0, 0, 0, 0, 0 };
-    hid_device_send_interrupt_message(hid_cid, report, sizeof(report));
+    send_report(modifier, keycode);
     sleep_ms(30);
-
-    report[4] = 0;
-    hid_device_send_interrupt_message(hid_cid, report, sizeof(report));
+    send_report(0, 0);
 
     // Short flash
     sleep_ms(50);
@@ -404,34 +207,12 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
                             }
                             app_state = APP_CONNECTED;
                             hid_cid = hid_subevent_connection_opened_get_hid_cid(packet);
-#ifdef HAVE_BTSTACK_STDIN                        
-                            printf("HID Connected, please start typing...\n");
-#else                        
-                            printf("HID Connected, sending demo text...\n");
-                            demo_text_timer_handler(NULL);
-#endif
+                            printf("HID Connected...\n");
                             break;
                         case HID_SUBEVENT_CONNECTION_CLOSED:
-                            btstack_run_loop_remove_timer(&send_timer);
                             printf("HID Disconnected\n");
                             app_state = APP_NOT_CONNECTED;
                             hid_cid = 0;
-                            break;
-                        case HID_SUBEVENT_CAN_SEND_NOW:
-                            if (send_keycode){
-                                send_report(send_modifier, send_keycode);
-                                // schedule key up
-                                send_keycode = 0;
-                                send_modifier = 0;
-                                btstack_run_loop_set_timer_handler(&send_timer, trigger_key_up);
-                                btstack_run_loop_set_timer(&send_timer, TYPING_KEYDOWN_MS);
-                            } else {
-                                send_report(0, 0);
-                                // schedule next key down
-                                btstack_run_loop_set_timer_handler(&send_timer, send_next);
-                                btstack_run_loop_set_timer(&send_timer, TYPING_DELAY_MS);
-                            }
-                            btstack_run_loop_add_timer(&send_timer);
                             break;
                         default:
                             break;
@@ -459,12 +240,12 @@ static void gpio_timer_handler(btstack_timer_source_t *ts) {
 
         // Detect press of I (transition: released -> pressed)
         if (last_i_state && !i_now) {
-            send_single_key(0x0C);   // 'I'
+            send_single_key(0, 0x0C);   // 'I'
         }
 
         // Detect press of K
         if (last_k_state && !k_now) {
-            send_single_key(0x0E);   // 'K'
+            send_single_key(0, 0x0E);   // 'K'
         }
 
         // Update state
@@ -553,13 +334,6 @@ int btstack_main(int argc, const char * argv[]){
     // register for HID events
     hid_device_register_packet_handler(&packet_handler);
 
-#ifdef HAVE_BTSTACK_STDIN
-    sscanf_bd_addr(device_addr_string, device_addr);
-    btstack_stdin_setup(stdin_process);
-#endif
-
-    btstack_ring_buffer_init(&send_buffer, send_buffer_storage, sizeof(send_buffer_storage));
-
     // Button GPIOs
     gpio_init(BUTTON_I);
     gpio_set_dir(BUTTON_I, GPIO_IN);
@@ -585,5 +359,3 @@ int btstack_main(int argc, const char * argv[]){
     // turn on!
     hci_power_control(HCI_POWER_ON);
 }
-/* EXAMPLE_END */
-
