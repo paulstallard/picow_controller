@@ -18,6 +18,7 @@ connect to a BLE keyboard and uses the same shortcuts.
 
 - Appears as a BLE keyboard to iPad, iPhone, macOS, Windows, Linux  
 - Sends **I** or **K** when GPIO buttons are pressed  
+- Sends CMD-SHIFT 3 (iOS screeshot shortcut) if a third button is added
 - One keypress per physical press (debounced via edge detection)  
 - Onboard LED flashes briefly on each keypress  
 - Fast LED blink when **not connected** (pairing mode)  
@@ -31,7 +32,7 @@ connect to a BLE keyboard and uses the same shortcuts.
 ## 🛠 Hardware Requirements
 
 - Raspberry Pi Pico W  
-- 2 × momentary push buttons  
+- 2 × momentary push buttons (3 if you want the screenshot option)
 - Wires / breadboard  
 - USB cable for flashing (and power)
 
@@ -46,6 +47,7 @@ Default pins:
 |--------|----------|
 | I key  | GP14     |
 | K key  | GP15     |
+| Screenshot key  | GP13     |
 
 ---
 
@@ -155,10 +157,11 @@ A second BTstack timer drives the LED blink pattern based on connection state.
 
 Keycodes used:
 
-| Key | HID Code |
-|-----|----------|
-| I   | 0x0C     |
-| K   | 0x0E     |
+| Key        | Modifier | HID Code |
+|------------|----------|----------|
+| I          | 0x00     | 0x0C     |
+| K          | 0x00     | 0x0E     |
+| Screenshot | 0x0A     | 0x20     |
 
 ---
 

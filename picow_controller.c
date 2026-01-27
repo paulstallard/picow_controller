@@ -52,6 +52,7 @@
 
 #define BUTTON_I 14
 #define BUTTON_K 15
+#define BUTTON_P 13 // take a photo. Sends CMD_SHFT_3
 
 // LED status state
 static btstack_timer_source_t led_timer;
@@ -230,6 +231,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
 // Button state for edge detection
 static bool last_i_state = true;   // true = released (because of pull-up)
 static bool last_k_state = true;
+static bool last_p_state = true;
 
 static btstack_timer_source_t gpio_timer;
 static void gpio_timer_handler(btstack_timer_source_t *ts) {
@@ -237,6 +239,7 @@ static void gpio_timer_handler(btstack_timer_source_t *ts) {
 
         bool i_now = gpio_get(BUTTON_I);   // true = released, false = pressed
         bool k_now = gpio_get(BUTTON_K);
+        bool p_now = gpio_get(BUTTON_P);
 
         // Detect press of I (transition: released -> pressed)
         if (last_i_state && !i_now) {
@@ -248,9 +251,15 @@ static void gpio_timer_handler(btstack_timer_source_t *ts) {
             send_single_key(0, 0x0E);   // 'K'
         }
 
+        // Detect press of photo
+        if (last_p_state && !p_now) {
+            send_single_key(0x0A, 0x20);   // 'Cmd-Shift 3'
+        }
+
         // Update state
         last_i_state = i_now;
         last_k_state = k_now;
+        last_p_state = p_now;
     }
 
     // Re-arm timer
@@ -342,6 +351,10 @@ int btstack_main(int argc, const char * argv[]){
     gpio_init(BUTTON_K);
     gpio_set_dir(BUTTON_K, GPIO_IN);
     gpio_pull_up(BUTTON_K);
+
+    gpio_init(BUTTON_P);
+    gpio_set_dir(BUTTON_P, GPIO_IN);
+    gpio_pull_up(BUTTON_P);
 
     // ensure LED starts off
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
